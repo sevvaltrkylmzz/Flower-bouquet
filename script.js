@@ -13,44 +13,179 @@ function decodeData(str) {
 }
 
 const THEMES = {
-  rose:  { petal: 'var(--rose-petal)',  petal2: 'var(--rose-petal-2)',  center: 'var(--rose-center)',  flat: false },
-  tulip: { petal: 'var(--tulip-petal)', petal2: 'var(--tulip-petal-2)', center: 'var(--tulip-center)', flat: false },
-  daisy: { petal: 'var(--daisy-petal)', petal2: 'var(--daisy-petal-2)', center: 'var(--daisy-center)', flat: true  },
-  sun:   { petal: 'var(--sun-petal)',   petal2: 'var(--sun-petal-2)',   center: 'var(--sun-center)',   flat: true  }
+  mixed: { stem: '#3f6b3a', petals: ['#e2493f', '#e8c15a', '#8b5fae', '#f3ece2', '#d98aa5'] },
+  rose:  { stem: '#3f6b3a', petals: ['#c73550', '#e8637f', '#7a1f30', '#f3c9d2'] },
+  tulip: { stem: '#3f6b3a', petals: ['#ff8fae', '#ffd1df', '#e85f8a', '#fff3f6'] },
+  sun:   { stem: '#4f7a3a', petals: ['#ffd23f', '#ffb703', '#f4845f', '#fff6df'] }
 };
 
-// ---------- Arka plan uçuşan yapraklar ----------
+// ---------- Arka plan yıldız tozu ----------
 
-function spawnPetals() {
-  const layer = document.getElementById('petalLayer');
+function spawnStars() {
+  const layer = document.getElementById('starfield');
   if (!layer) return;
-  setInterval(() => {
-    const p = document.createElement('div');
-    p.className = 'fp';
-    p.style.left = Math.random() * 100 + 'vw';
-    const dur = 6 + Math.random() * 6;
-    p.style.animationDuration = dur + 's';
-    p.style.background = Math.random() > 0.5 ? '#e75480' : '#ffc1d9';
-    p.style.width = p.style.height = (8 + Math.random() * 10) + 'px';
-    layer.appendChild(p);
-    setTimeout(() => p.remove(), dur * 1000 + 500);
-  }, 450);
+  const count = Math.min(60, Math.floor(window.innerWidth / 14));
+  for (let i = 0; i < count; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    s.style.left = Math.random() * 100 + 'vw';
+    s.style.top = Math.random() * 100 + 'vh';
+    s.style.animationDelay = (Math.random() * 3) + 's';
+    s.style.animationDuration = (2.5 + Math.random() * 2.5) + 's';
+    layer.appendChild(s);
+  }
+}
+
+// ---------- Piksel / halftone buket üretimi ----------
+
+function seededRandom(seed) {
+  let s = seed % 2147483647;
+  if (s <= 0) s += 2147483646;
+  return function () {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+function hashString(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h << 5) - h + str.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h) || 1;
+}
+
+// Küçük bir kaynak tuvale buket çizer (saplar + çiçek lekeleri).
+function createSourceArt(theme, seedStr) {
+  const W = 48, H = 66;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext('2d');
+  const rnd = seededRandom(hashString(seedStr || 'bouquet'));
+
+  // sap / yaprak yıldızı (taban)
+  const baseX = W / 2, baseY = H - 6;
+  ctx.fillStyle = theme.stem;
+  const spikes = 11;
+  ctx.beginPath();
+  for (let i = 0; i < spikes; i++) {
+    const a = -Math.PI + (Math.PI / (spikes - 1)) * i;
+    const len = 20 + rnd() * 14;
+    const x1 = baseX + Math.cos(a) * 2, y1 = baseY + Math.sin(a) * 2;
+    const x2 = baseX + Math.cos(a) * len, y2 = baseY + Math.sin(a) * len * 0.85;
+    const perp = a + Math.PI / 2;
+    const spread = 2.1;
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2 + Math.cos(perp) * spread, y2 + Math.sin(perp) * spread);
+    ctx.lineTo(x2 - Math.cos(perp) * spread, y2 - Math.sin(perp) * spread);
+    ctx.closePath();
+  }
+  ctx.fill();
+
+  // çiçek lekeleri (üst küme) — merkeze yakın yoğun, kenarlarda seyrekleşen dolgu
+  const cx = W / 2, cy = H * 0.4;
+  const blobCount = 30;
+  for (let i = 0; i < blobCount; i++) {
+    const ang = rnd() * Math.PI * 2;
+    const dist = Math.sqrt(rnd()) * W * 0.34;
+    const bx = cx + Math.cos(ang) * dist;
+    const by = cy + Math.sin(ang) * dist * 0.8;
+    const r = 6 + rnd() * 8;
+    const color = theme.petals[Math.floor(rnd() * theme.petals.length)];
+    const g = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+    g.addColorStop(0, color);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  return c;
+}
+
+// Kaynak tuvali, her pikseli bir noktaya çeviren halftone görünümüne render eder.
+function renderHalftone(sourceCanvas, destCanvas, cell) {
+  const W = sourceCanvas.width, H = sourceCanvas.height;
+  const sctx = sourceCanvas.getContext('2d');
+  const data = sctx.getImageData(0, 0, W, H).data;
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  destCanvas.width = W * cell * dpr;
+  destCanvas.height = H * cell * dpr;
+  destCanvas.style.width = (W * cell) + 'px';
+  destCanvas.style.height = (H * cell) + 'px';
+
+  const dctx = destCanvas.getContext('2d');
+  dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  dctx.clearRect(0, 0, W * cell, H * cell);
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = (y * W + x) * 4;
+      const a = data[idx + 3] / 255;
+      if (a < 0.06) continue;
+      const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+      const px = x * cell + cell / 2;
+      const py = y * cell + cell / 2;
+      const radius = (cell / 2) * Math.min(1, a) * 0.9;
+      dctx.beginPath();
+      dctx.fillStyle = `rgba(${r},${g},${b},${Math.min(1, a + 0.12)})`;
+      dctx.arc(px, py, radius, 0, Math.PI * 2);
+      dctx.fill();
+    }
+  }
+}
+
+function drawBouquet(canvas, themeKey, seedStr, cell) {
+  const theme = THEMES[themeKey] || THEMES.mixed;
+  const source = createSourceArt(theme, seedStr);
+  renderHalftone(source, canvas, cell);
 }
 
 // ---------- Oluşturma ekranı ----------
 
+function currentTheme(form) {
+  const checked = form.querySelector('input[name="theme"]:checked');
+  return checked ? checked.value : 'mixed';
+}
+
 function initCreateScreen() {
   const form = document.getElementById('bouquetForm');
   if (!form) return;
+
+  const previewCanvas = document.getElementById('previewCanvas');
+  const previewForLine = document.getElementById('previewForLine');
+  const toInput = document.getElementById('toName');
+
+  function updatePreview() {
+    const theme = currentTheme(form);
+    drawBouquet(previewCanvas, theme, 'preview-' + theme, 7);
+  }
+
+  function updateForLine() {
+    const name = toInput.value.trim();
+    previewForLine.textContent = name ? `${name} için` : 'senin için';
+  }
+
+  form.querySelectorAll('input[name="theme"]').forEach((r) =>
+    r.addEventListener('change', updatePreview)
+  );
+  toInput.addEventListener('input', updateForLine);
+
+  updatePreview();
+  updateForLine();
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const to = document.getElementById('toName').value.trim();
     const from = document.getElementById('fromName').value.trim();
     const message = document.getElementById('message').value.trim();
-    const theme = form.querySelector('input[name="theme"]:checked').value;
+    const theme = currentTheme(form);
 
-    if (!to || !from || !message) return;
+    if (!to) return;
 
     const data = encodeData({ to, from, message, theme });
     const url = new URL(window.location.href);
@@ -81,66 +216,7 @@ function initCreateScreen() {
 
 // ---------- Sunum ekranı ----------
 
-function buildBouquet(theme) {
-  const cfg = THEMES[theme] || THEMES.rose;
-  const stemsEl = document.getElementById('stems');
-  const flowersEl = document.getElementById('flowers');
-
-  // flower positions (x offset from center, height, size, delay)
-  const layout = [
-    { x: -70, h: 150, size: 60, delay: 0.0,  petals: cfg.petal2 },
-    { x: -35, h: 190, size: 68, delay: 0.15, petals: cfg.petal },
-    { x: 0,   h: 210, size: 76, delay: 0.3,  petals: cfg.petal2 },
-    { x: 35,  h: 190, size: 68, delay: 0.45, petals: cfg.petal },
-    { x: 70,  h: 150, size: 60, delay: 0.6,  petals: cfg.petal2 }
-  ];
-
-  layout.forEach((f) => {
-    // stem
-    const stem = document.createElement('div');
-    stem.className = 'stem';
-    stem.style.left = `calc(50% + ${f.x}px)`;
-    stem.style.setProperty('--stem-h', f.h + 'px');
-    stem.style.animationDelay = f.delay + 's';
-    stemsEl.appendChild(stem);
-
-    // leaf
-    const leaf = document.createElement('div');
-    leaf.className = 'leaf';
-    leaf.style.left = `calc(50% + ${f.x + (f.x < 0 ? -18 : 2)}px)`;
-    leaf.style.bottom = (f.h * 0.35) + 'px';
-    leaf.style.setProperty('--leaf-rot', (f.x < 0 ? -30 : 30) + 'deg');
-    leaf.style.animationDelay = (f.delay + 0.3) + 's';
-    stemsEl.appendChild(leaf);
-
-    // flower head
-    const flower = document.createElement('div');
-    flower.className = 'flower' + (cfg.flat ? ' flat' : '');
-    flower.style.left = `calc(50% + ${f.x - f.size / 2}px)`;
-    flower.style.bottom = (f.h - f.size / 2.6) + 'px';
-    flower.style.width = f.size + 'px';
-    flower.style.height = f.size + 'px';
-    flower.style.animationDelay = (f.delay + 0.5) + 's';
-
-    const petalCount = cfg.flat ? 10 : 6;
-    for (let i = 0; i < petalCount; i++) {
-      const petal = document.createElement('div');
-      petal.className = 'petal';
-      petal.style.setProperty('--petal-color', f.petals);
-      petal.style.transform = `translate(-50%, -100%) rotate(${(360 / petalCount) * i}deg)`;
-      flower.appendChild(petal);
-    }
-
-    const center = document.createElement('div');
-    center.className = 'flower-center';
-    center.style.setProperty('--center-color', cfg.center);
-    flower.appendChild(center);
-
-    flowersEl.appendChild(flower);
-  });
-}
-
-function typeText(el, text, speed = 35) {
+function typeText(el, text, speed = 32) {
   el.textContent = '';
   let i = 0;
   return new Promise((resolve) => {
@@ -159,29 +235,36 @@ async function initPresentScreen(data) {
   document.getElementById('createScreen').classList.add('hidden');
   document.getElementById('presentScreen').classList.remove('hidden');
 
-  buildBouquet(data.theme);
+  document.getElementById('toLine').textContent = `${data.to} için`;
 
-  document.getElementById('toLine').textContent = `Sevgili ${data.to},`;
-  document.getElementById('fromLine').textContent = `— ${data.from}`;
+  const canvas = document.getElementById('presentCanvas');
+  drawBouquet(canvas, data.theme, 'present-' + data.to, 9);
 
-  setTimeout(async () => {
-    const card = document.getElementById('messageCard');
-    card.classList.remove('hidden');
-    await typeText(document.getElementById('msgLine'), data.message);
-  }, 2800);
+  if (data.message || data.from) {
+    setTimeout(async () => {
+      const card = document.getElementById('messageCard');
+      card.classList.remove('hidden');
+      if (data.message) {
+        await typeText(document.getElementById('msgLine'), data.message);
+      } else {
+        document.getElementById('msgLine').remove();
+      }
+      document.getElementById('fromLine').textContent = data.from ? `— ${data.from}` : '';
+    }, 2200);
+  }
 }
 
 // ---------- Başlat ----------
 
 function main() {
-  spawnPetals();
+  spawnStars();
   initCreateScreen();
 
   const params = new URLSearchParams(window.location.search);
   const raw = params.get('data');
   if (raw) {
     const data = decodeData(raw);
-    if (data && data.to && data.message && data.from) {
+    if (data && data.to) {
       initPresentScreen(data);
       return;
     }

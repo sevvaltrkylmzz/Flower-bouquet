@@ -3,59 +3,78 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Çiçek Gönder 💐</title>
+<title>Piksel Buket 💐</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="petal-layer" id="petalLayer"></div>
+<div class="starfield" id="starfield"></div>
 
 <!-- ============ OLUŞTURMA EKRANI ============ -->
 <main id="createScreen" class="screen">
-  <h1 class="title">Birine Çiçek Gönder 💐</h1>
-  <p class="subtitle">Sevdiğin birine küçük ama güzel bir buket hazırla, linkini gönder.</p>
+  <div class="hero">
+    <p class="eyebrow">Piksel Buket</p>
+    <h1 class="headline">Ona, <em>açılan</em><br>çiçekler gönder.</h1>
+    <p class="lede">Adını yaz, kısa bir not ekle, linki paylaş. Açtığında noktalardan
+      örülmüş bir çiçek buketi önünde açar. Ücretsiz, üyelik yok.</p>
+  </div>
 
-  <form id="bouquetForm" class="card">
+  <section class="preview-card">
+    <div class="preview-head">
+      <span class="eyebrow small">Canlı Önizleme</span>
+      <span class="for-line" id="previewForLine">senin için</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="previewCanvas"></canvas>
+    </div>
+  </section>
+
+  <form id="bouquetForm" class="form-card">
     <label>
-      Alıcının adı
-      <input type="text" id="toName" placeholder="örn. Ayşe" required maxlength="40">
+      <span>Kime?</span>
+      <input type="text" id="toName" placeholder="Alıcının adı" required maxlength="40">
     </label>
 
     <label>
-      Senin adın
-      <input type="text" id="fromName" placeholder="örn. Mehmet" required maxlength="40">
+      <span>Kimden <em>(opsiyonel)</em></span>
+      <input type="text" id="fromName" placeholder="Senin adın" maxlength="40">
     </label>
 
     <label>
-      Mesajın
-      <textarea id="message" placeholder="Ona ne söylemek istersin?" maxlength="200" required></textarea>
+      <span>Kısa bir not <em>(opsiyonel)</em></span>
+      <textarea id="message" placeholder="Ona ne söylemek istersin?" maxlength="200"></textarea>
     </label>
 
-    <fieldset class="theme-picker">
-      <legend>Buket teması</legend>
-      <label class="theme-option">
-        <input type="radio" name="theme" value="rose" checked>
-        <span class="swatch rose"></span> Kırmızı Gül
-      </label>
-      <label class="theme-option">
-        <input type="radio" name="theme" value="tulip">
-        <span class="swatch tulip"></span> Pembe Lale
-      </label>
-      <label class="theme-option">
-        <input type="radio" name="theme" value="daisy">
-        <span class="swatch daisy"></span> Mor Papatya
-      </label>
-      <label class="theme-option">
-        <input type="radio" name="theme" value="sun">
-        <span class="swatch sun"></span> Sarı Ayçiçeği
-      </label>
-    </fieldset>
+    <div class="theme-row">
+      <span class="theme-label">Çiçek paleti</span>
+      <div class="swatches">
+        <label class="swatch-option">
+          <input type="radio" name="theme" value="mixed" checked>
+          <span class="swatch mixed"></span>
+        </label>
+        <label class="swatch-option">
+          <input type="radio" name="theme" value="rose">
+          <span class="swatch rose"></span>
+        </label>
+        <label class="swatch-option">
+          <input type="radio" name="theme" value="tulip">
+          <span class="swatch tulip"></span>
+        </label>
+        <label class="swatch-option">
+          <input type="radio" name="theme" value="sun">
+          <span class="swatch sun"></span>
+        </label>
+      </div>
+    </div>
 
-    <button type="submit" class="btn-primary">Buketi Hazırla 🌸</button>
+    <button type="submit" class="btn-primary">Buketi oluştur</button>
   </form>
 
-  <div id="linkBox" class="card link-box hidden">
-    <p>Buketin hazır! Bu linki gönder:</p>
+  <div id="linkBox" class="form-card link-box hidden">
+    <p class="link-label">Buketin hazır. Bu linki gönder:</p>
     <div class="link-row">
       <input type="text" id="shareLink" readonly>
       <button id="copyBtn" class="btn-secondary">Kopyala</button>
@@ -66,22 +85,19 @@
 
 <!-- ============ SUNUM EKRANI ============ -->
 <main id="presentScreen" class="screen hidden">
-  <div class="stage">
-    <div class="bouquet" id="bouquet">
-      <div class="wrap"></div>
-      <div class="ribbon"></div>
-      <div class="stems" id="stems"></div>
-      <div class="flowers" id="flowers"></div>
-    </div>
+  <p class="eyebrow">Sana bir buket</p>
+  <p class="for-line big" id="toLine"></p>
+
+  <div class="canvas-wrap big reveal" id="revealWrap">
+    <canvas id="presentCanvas"></canvas>
   </div>
 
-  <div class="message-card hidden" id="messageCard">
-    <p class="to-line" id="toLine"></p>
+  <div class="note-card hidden" id="messageCard">
     <p class="msg-line" id="msgLine"></p>
     <p class="from-line" id="fromLine"></p>
   </div>
 
-  <a href="./" class="btn-text back-link">🌼 Sen de birine çiçek gönder</a>
+  <a href="./" class="btn-text back-link">Sen de birine gönder →</a>
 </main>
 
 <script src="script.js"></script>
