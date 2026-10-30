@@ -1,0 +1,393 @@
+:root {
+  --bg-1: #fdf2f8;
+  --bg-2: #eef2ff;
+  --ink: #3b2b35;
+  --ink-soft: #6b5b63;
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --accent: #e75480;
+  --accent-dark: #c43e68;
+  --stem: #4c7a4f;
+  --leaf: #5a9460;
+
+  --rose-petal: #e0355b;
+  --rose-petal-2: #ff6b89;
+  --rose-center: #8f1d3a;
+
+  --tulip-petal: #ff8fb1;
+  --tulip-petal-2: #ffc1d9;
+  --tulip-center: #d94f82;
+
+  --daisy-petal: #b48bd4;
+  --daisy-petal-2: #d9b8f0;
+  --daisy-center: #ffd166;
+
+  --sun-petal: #ffd23f;
+  --sun-petal-2: #ffb703;
+  --sun-center: #6b3f1d;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: radial-gradient(circle at 20% 20%, var(--bg-1), var(--bg-2) 70%);
+  color: var(--ink);
+  overflow-x: hidden;
+}
+
+.screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 20px 80px;
+  position: relative;
+  z-index: 1;
+}
+
+.hidden { display: none !important; }
+
+.title {
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  margin: 0 0 6px;
+  text-align: center;
+}
+
+.subtitle {
+  color: var(--ink-soft);
+  margin: 0 0 28px;
+  text-align: center;
+  max-width: 420px;
+}
+
+.card {
+  background: var(--card-bg);
+  backdrop-filter: blur(6px);
+  border-radius: 18px;
+  padding: 24px;
+  width: min(420px, 100%);
+  box-shadow: 0 10px 30px rgba(190, 80, 120, 0.15);
+}
+
+.card label {
+  display: block;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.card input[type="text"],
+.card textarea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid #e7d3dc;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  color: var(--ink);
+  background: #fff;
+}
+
+.card textarea { min-height: 70px; }
+
+.card input:focus, .card textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.theme-picker {
+  border: none;
+  padding: 0;
+  margin: 0 0 20px;
+}
+
+.theme-picker legend {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+.theme-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 10px 4px 0;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.swatch.rose { background: var(--rose-petal); }
+.swatch.tulip { background: var(--tulip-petal); }
+.swatch.daisy { background: var(--daisy-petal); }
+.swatch.sun { background: var(--sun-petal); }
+
+.btn-primary, .btn-secondary {
+  border: none;
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-primary {
+  width: 100%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(231, 84, 128, 0.35);
+}
+.btn-primary:hover { transform: translateY(-2px); }
+
+.btn-secondary {
+  background: #fff;
+  color: var(--accent-dark);
+  border: 1px solid var(--accent);
+  white-space: nowrap;
+}
+.btn-secondary:hover { background: #fff0f4; }
+
+.btn-text {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--accent-dark);
+  text-decoration: none;
+  font-weight: 600;
+}
+.btn-text:hover { text-decoration: underline; }
+
+.link-box { margin-top: 20px; text-align: center; }
+.link-row { display: flex; gap: 8px; margin: 10px 0; }
+.link-row input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e7d3dc;
+  font-size: 0.85rem;
+}
+
+/* ============ PRESENT SCREEN ============ */
+
+.stage {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
+}
+
+.bouquet {
+  position: relative;
+  width: 280px;
+  height: 380px;
+}
+
+.wrap {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 220px;
+  height: 180px;
+  background: linear-gradient(135deg, #fff7f0, #ffe3ea);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  transform: translateX(-50%) scale(0.2);
+  transform-origin: bottom center;
+  opacity: 0;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+  animation: wrapIn 0.8s ease forwards 1.6s;
+  z-index: 3;
+}
+
+.ribbon {
+  position: absolute;
+  bottom: 70px;
+  left: 50%;
+  width: 60px;
+  height: 24px;
+  background: var(--accent);
+  border-radius: 4px;
+  transform: translateX(-50%) scaleX(0);
+  opacity: 0;
+  z-index: 4;
+  animation: ribbonIn 0.4s ease forwards 2.2s;
+}
+.ribbon::before, .ribbon::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  width: 20px;
+  height: 36px;
+  background: var(--accent);
+  border-radius: 40% 40% 50% 50%;
+}
+.ribbon::before { left: -14px; transform: rotate(25deg); }
+.ribbon::after { right: -14px; transform: rotate(-25deg); }
+
+.stems { position: absolute; bottom: 60px; left: 0; width: 100%; height: 100%; z-index: 1; }
+.flowers { position: absolute; bottom: 60px; left: 0; width: 100%; height: 100%; z-index: 2; }
+
+.stem {
+  position: absolute;
+  bottom: 0;
+  width: 6px;
+  height: 0;
+  background: linear-gradient(to top, var(--stem), var(--leaf));
+  border-radius: 4px;
+  transform-origin: bottom center;
+  animation: growStem 0.7s ease forwards;
+}
+
+.leaf {
+  position: absolute;
+  width: 26px;
+  height: 14px;
+  background: var(--leaf);
+  border-radius: 0 50% 0 50%;
+  opacity: 0;
+  animation: leafIn 0.4s ease forwards;
+}
+
+.flower {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  transform: scale(0) rotate(-40deg);
+  opacity: 0;
+  animation: bloom 0.6s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+
+.petal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 34px;
+  height: 46px;
+  background: var(--petal-color, var(--rose-petal));
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  transform-origin: bottom center;
+}
+
+.flower-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--center-color, var(--rose-center));
+  transform: translate(-50%, -50%);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
+}
+
+/* daisy-style flat petals for the "daisy" & "sun" themes */
+.flower.flat .petal {
+  width: 16px;
+  height: 36px;
+  border-radius: 50% 50% 8px 8px;
+}
+
+@keyframes growStem {
+  from { height: 0; }
+  to { height: var(--stem-h, 160px); }
+}
+
+@keyframes leafIn {
+  from { opacity: 0; transform: scale(0) rotate(var(--leaf-rot, 0deg)); }
+  to { opacity: 1; transform: scale(1) rotate(var(--leaf-rot, 0deg)); }
+}
+
+@keyframes bloom {
+  0% { transform: scale(0) rotate(-40deg); opacity: 0; }
+  70% { transform: scale(1.15) rotate(8deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes wrapIn {
+  from { opacity: 0; transform: translateX(-50%) scale(0.2); }
+  to { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+@keyframes ribbonIn {
+  from { opacity: 0; transform: translateX(-50%) scaleX(0); }
+  to { opacity: 1; transform: translateX(-50%) scaleX(1); }
+}
+
+.message-card {
+  margin-top: 30px;
+  background: var(--card-bg);
+  backdrop-filter: blur(6px);
+  border-radius: 18px;
+  padding: 26px 30px;
+  max-width: 420px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(190, 80, 120, 0.15);
+  opacity: 0;
+  transform: translateY(14px);
+  animation: cardIn 0.6s ease forwards;
+}
+
+@keyframes cardIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.to-line {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0 0 10px;
+  color: var(--accent-dark);
+}
+
+.msg-line {
+  font-size: 1.05rem;
+  line-height: 1.5;
+  margin: 0 0 14px;
+  min-height: 1.5em;
+  white-space: pre-wrap;
+}
+
+.from-line {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.back-link { margin-top: 10px; }
+
+/* floating petal background */
+.petal-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.fp {
+  position: absolute;
+  top: -40px;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50% 0 50% 50%;
+  opacity: 0.6;
+  animation: fall linear forwards;
+}
+
+@keyframes fall {
+  to { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+}
+
+@media (max-width: 420px) {
+  .bouquet { width: 240px; }
+}

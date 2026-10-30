@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Çiçek Gönder 💐</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="petal-layer" id="petalLayer"></div>
+
+<!-- ============ OLUŞTURMA EKRANI ============ -->
+<main id="createScreen" class="screen">
+  <h1 class="title">Birine Çiçek Gönder 💐</h1>
+  <p class="subtitle">Sevdiğin birine küçük ama güzel bir buket hazırla, linkini gönder.</p>
+
+  <form id="bouquetForm" class="card">
+    <label>
+      Alıcının adı
+      <input type="text" id="toName" placeholder="örn. Ayşe" required maxlength="40">
+    </label>
+
+    <label>
+      Senin adın
+      <input type="text" id="fromName" placeholder="örn. Mehmet" required maxlength="40">
+    </label>
+
+    <label>
+      Mesajın
+      <textarea id="message" placeholder="Ona ne söylemek istersin?" maxlength="200" required></textarea>
+    </label>
+
+    <fieldset class="theme-picker">
+      <legend>Buket teması</legend>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="rose" checked>
+        <span class="swatch rose"></span> Kırmızı Gül
+      </label>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="tulip">
+        <span class="swatch tulip"></span> Pembe Lale
+      </label>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="daisy">
+        <span class="swatch daisy"></span> Mor Papatya
+      </label>
+      <label class="theme-option">
+        <input type="radio" name="theme" value="sun">
+        <span class="swatch sun"></span> Sarı Ayçiçeği
+      </label>
+    </fieldset>
+
+    <button type="submit" class="btn-primary">Buketi Hazırla 🌸</button>
+  </form>
+
+  <div id="linkBox" class="card link-box hidden">
+    <p>Buketin hazır! Bu linki gönder:</p>
+    <div class="link-row">
+      <input type="text" id="shareLink" readonly>
+      <button id="copyBtn" class="btn-secondary">Kopyala</button>
+    </div>
+    <a id="previewLink" class="btn-text" target="_blank">Önizlemeyi aç →</a>
+  </div>
+</main>
+
+<!-- ============ SUNUM EKRANI ============ -->
+<main id="presentScreen" class="screen hidden">
+  <div class="stage">
+    <div class="bouquet" id="bouquet">
+      <div class="wrap"></div>
+      <div class="ribbon"></div>
+      <div class="stems" id="stems"></div>
+      <div class="flowers" id="flowers"></div>
+    </div>
+  </div>
+
+  <div class="message-card hidden" id="messageCard">
+    <p class="to-line" id="toLine"></p>
+    <p class="msg-line" id="msgLine"></p>
+    <p class="from-line" id="fromLine"></p>
+  </div>
+
+  <a href="./" class="btn-text back-link">🌼 Sen de birine çiçek gönder</a>
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>
