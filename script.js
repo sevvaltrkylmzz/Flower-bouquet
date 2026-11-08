@@ -80,11 +80,11 @@ function hashString(str) {
 // hedef tuvalin gerçek W/H'ine ölçeklenir.
 const REF_W = 300, REF_H = 380;
 const LAYOUT = [
-  { x: -82, h: 200, size: 72 },
-  { x: -44, h: 248, size: 82 },
-  { x: 0, h: 276, size: 92 },
-  { x: 44, h: 248, size: 82 },
-  { x: 82, h: 200, size: 72 }
+  { x: -84, h: 135, size: 100 },
+  { x: -45, h: 175, size: 114 },
+  { x: 0, h: 198, size: 128 },
+  { x: 45, h: 175, size: 114 },
+  { x: 84, h: 135, size: 100 }
 ];
 const LEAF_SPIKE_COUNT = 15;
 
@@ -431,7 +431,7 @@ function initCreateScreen() {
 
   function updatePreview() {
     const theme = currentTheme(form);
-    animateBouquet(previewCanvas, theme, 'preview-' + theme, 280, 320, { duration: 2400 });
+    animateBouquet(previewCanvas, theme, 'preview-' + theme, 340, 360, { duration: 2600 });
   }
 
   function updateForLine() {
@@ -507,7 +507,7 @@ async function initPresentScreen(data) {
   document.getElementById('toLine').textContent = `${data.to} için`;
 
   const canvas = document.getElementById('presentCanvas');
-  animateBouquet(canvas, data.theme, 'present-' + data.to, 360, 430, { duration: 3800 });
+  animateBouquet(canvas, data.theme, 'present-' + data.to, 440, 480, { duration: 4000 });
 
   if (data.message || data.from) {
     setTimeout(async () => {
