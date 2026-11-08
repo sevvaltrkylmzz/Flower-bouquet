@@ -13,10 +13,30 @@ function decodeData(str) {
 }
 
 const THEMES = {
-  mixed: { stem: '#3f6b3a', petals: ['#e2493f', '#e8c15a', '#8b5fae', '#f3ece2', '#d98aa5'] },
-  rose:  { stem: '#3f6b3a', petals: ['#c73550', '#e8637f', '#7a1f30', '#f3c9d2'] },
-  tulip: { stem: '#3f6b3a', petals: ['#ff8fae', '#ffd1df', '#e85f8a', '#fff3f6'] },
-  sun:   { stem: '#4f7a3a', petals: ['#ffd23f', '#ffb703', '#f4845f', '#fff6df'] }
+  mixed: {
+    stem: '#3f6b3a',
+    flowerColors: ['#e2493f', '#e8c15a', '#8b5fae', '#f3ece2', '#d98aa5'],
+    centers: ['#8f1d3a', '#6b3f1d', '#4a2a63', '#caa7b0', '#8f1d3a'],
+    flat: false
+  },
+  rose: {
+    stem: '#3f6b3a',
+    flowerColors: ['#e0355b', '#ff6b89', '#c43e68', '#ff85a1', '#e0355b'],
+    centers: ['#7a1f30'],
+    flat: false
+  },
+  tulip: {
+    stem: '#3f6b3a',
+    flowerColors: ['#ff8fae', '#ffc1d9', '#ff6fa0', '#ffd6e5', '#ff8fae'],
+    centers: ['#d94f82'],
+    flat: false
+  },
+  sun: {
+    stem: '#4f7a3a',
+    flowerColors: ['#ffd23f', '#ffb703', '#f4a300', '#ffcf4d', '#ffd23f'],
+    centers: ['#6b3f1d'],
+    flat: true
+  }
 };
 
 // ---------- Arka plan yıldız tozu ----------
@@ -56,11 +76,16 @@ function hashString(str) {
   return Math.abs(h) || 1;
 }
 
-const SRC_W = 48, SRC_H = 66;
-const BASE_X = SRC_W / 2, BASE_Y = SRC_H - 6;
-const SPIKE_COUNT = 11;
-const BLOB_COUNT = 30;
-const CLUSTER_X = SRC_W / 2, CLUSTER_Y = SRC_H * 0.4;
+// Referans kutu: düzen sayıları bu 300x380 alana göre ayarlandı, her çizimde
+// hedef tuvalin gerçek W/H'ine ölçeklenir.
+const REF_W = 300, REF_H = 380;
+const LAYOUT = [
+  { x: -70, h: 150, size: 60 },
+  { x: -35, h: 190, size: 68 },
+  { x: 0, h: 210, size: 76 },
+  { x: 35, h: 190, size: 68 },
+  { x: 70, h: 150, size: 60 }
+];
 
 function easeOutCubic(x) {
   return 1 - Math.pow(1 - x, 3);
@@ -71,123 +96,121 @@ function easeOutBack(x) {
   return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
 }
 
-// Buketin sabit "modelini" (sap açıları, çiçek lekesi konum/renk/gecikmesi) üretir.
+// Buketin sabit "modelini" (sap/çiçek konumları, renkleri, gecikmeleri) üretir.
 // Aynı tohumla her zaman aynı şekli verir; animasyon sırasında yeniden rastgelelenmez.
-function buildBouquetModel(theme, seedStr) {
+function buildBouquetModel(theme, seedStr, W, H) {
   const rnd = seededRandom(hashString(seedStr || 'bouquet'));
+  const sx = W / REF_W, sy = H / REF_H;
+  const s = Math.min(sx, sy);
+  const baseY = H - 54 * sy;
 
-  const spikes = [];
-  for (let i = 0; i < SPIKE_COUNT; i++) {
-    const a = -Math.PI + (Math.PI / (SPIKE_COUNT - 1)) * i;
-    spikes.push({
-      angle: a,
-      maxLen: 20 + rnd() * 14,
-      delay: Math.abs(i - (SPIKE_COUNT - 1) / 2) / ((SPIKE_COUNT - 1) / 2) * 0.25
-    });
-  }
-
-  const blobs = [];
-  for (let i = 0; i < BLOB_COUNT; i++) {
-    const ang = rnd() * Math.PI * 2;
-    const distFrac = Math.sqrt(rnd());
-    blobs.push({
-      angle: ang,
-      dist: distFrac * SRC_W * 0.34,
-      maxR: 6 + rnd() * 8,
-      color: theme.petals[Math.floor(rnd() * theme.petals.length)],
-      delay: distFrac * 0.55
-    });
-  }
-
-  return { theme, spikes, blobs };
-}
-
-// Modeli, sap (stemT) ve açılma (bloomT) ilerlemesine göre bir kaynak tuvale çizer.
-function drawModelFrame(ctx, model, stemT, bloomT) {
-  ctx.clearRect(0, 0, SRC_W, SRC_H);
-
-  ctx.fillStyle = model.theme.stem;
-  model.spikes.forEach((sp) => {
-    const local = Math.max(0, Math.min(1, (stemT - sp.delay) / (1 - sp.delay)));
-    const grown = easeOutCubic(local);
-    if (grown <= 0) return;
-    const len = sp.maxLen * grown;
-    const x1 = BASE_X + Math.cos(sp.angle) * 2, y1 = BASE_Y + Math.sin(sp.angle) * 2;
-    const x2 = BASE_X + Math.cos(sp.angle) * len, y2 = BASE_Y + Math.sin(sp.angle) * len * 0.85;
-    const perp = sp.angle + Math.PI / 2;
-    const spread = 2.1 * grown;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2 + Math.cos(perp) * spread, y2 + Math.sin(perp) * spread);
-    ctx.lineTo(x2 - Math.cos(perp) * spread, y2 - Math.sin(perp) * spread);
-    ctx.closePath();
-    ctx.fill();
+  const flowers = LAYOUT.map((f, i) => {
+    const jitter = (rnd() - 0.5) * 6 * sx;
+    return {
+      x: W / 2 + f.x * sx + jitter,
+      baseY,
+      topY: baseY - f.h * sy,
+      size: f.size * s,
+      color: theme.flowerColors[i % theme.flowerColors.length],
+      center: theme.centers[i % theme.centers.length],
+      delay: (i / (LAYOUT.length - 1)) * 0.35,
+      petalCount: theme.flat ? 11 : 6,
+      flat: theme.flat
+    };
   });
 
-  if (bloomT <= 0) return;
-  model.blobs.forEach((b) => {
-    const local = Math.max(0, Math.min(1, (bloomT - b.delay) / (1 - b.delay)));
-    if (local <= 0) return;
-    const open = easeOutBack(local);
-    const r = Math.max(0, b.maxR * Math.min(1, open));
-    if (r <= 0.1) return;
-    const dist = b.dist * Math.min(1, local * 1.15);
-    const bx = CLUSTER_X + Math.cos(b.angle) * dist;
-    const by = CLUSTER_Y + Math.sin(b.angle) * dist * 0.8;
-    const g = ctx.createRadialGradient(bx, by, 0, bx, by, r);
-    g.addColorStop(0, b.color);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(bx, by, r, 0, Math.PI * 2);
-    ctx.fill();
-  });
+  return { theme, flowers, scale: s };
 }
 
-// Kaynak tuvali, her pikseli bir noktaya çeviren halftone görünümüne render eder.
-function renderHalftone(sourceCanvas, destCanvas, cell) {
-  const W = sourceCanvas.width, H = sourceCanvas.height;
-  const sctx = sourceCanvas.getContext('2d');
-  const data = sctx.getImageData(0, 0, W, H).data;
+function drawFlowerHead(ctx, f, open, headY) {
+  const petalLen = f.size * 0.52;
+  const petalWidth = f.size * (f.flat ? 0.16 : 0.34);
 
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  destCanvas.width = W * cell * dpr;
-  destCanvas.height = H * cell * dpr;
-  destCanvas.style.width = (W * cell) + 'px';
-  destCanvas.style.height = (H * cell) + 'px';
+  for (let j = 0; j < f.petalCount; j++) {
+    const angle = (Math.PI * 2 / f.petalCount) * j;
+    const twist = (1 - open) * 0.8 * (j % 2 === 0 ? 1 : -1);
+    ctx.save();
+    ctx.translate(f.x, headY);
+    ctx.rotate(angle + twist);
+    ctx.scale(open, open);
+    ctx.fillStyle = f.color;
+    ctx.beginPath();
+    ctx.ellipse(0, -petalLen * 0.52, petalWidth / 2, petalLen * 0.52, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 
-  const dctx = destCanvas.getContext('2d');
-  dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  dctx.clearRect(0, 0, W * cell, H * cell);
+  ctx.save();
+  ctx.translate(f.x, headY);
+  ctx.scale(open, open);
+  ctx.fillStyle = f.center;
+  ctx.beginPath();
+  ctx.arc(0, 0, f.size * 0.14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
 
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const idx = (y * W + x) * 4;
-      const a = data[idx + 3] / 255;
-      if (a < 0.06) continue;
-      const r = data[idx], g = data[idx + 1], b = data[idx + 2];
-      const px = x * cell + cell / 2;
-      const py = y * cell + cell / 2;
-      const radius = (cell / 2) * Math.min(1, a) * 0.9;
-      dctx.beginPath();
-      dctx.fillStyle = `rgba(${r},${g},${b},${Math.min(1, a + 0.12)})`;
-      dctx.arc(px, py, radius, 0, Math.PI * 2);
-      dctx.fill();
+function drawLeaf(ctx, x, y, s, dir, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(dir > 0 ? -0.5 : Math.PI + 0.5);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 14 * s, 6 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// Modeli, sap (stemT) ve açılma (bloomT) ilerlemesine göre tuvale çizer.
+function drawModelFrame(ctx, model, W, H, stemT, bloomT) {
+  ctx.clearRect(0, 0, W, H);
+  const grownStem = easeOutCubic(stemT);
+
+  model.flowers.forEach((f) => {
+    const curTopY = f.baseY - (f.baseY - f.topY) * grownStem;
+
+    ctx.strokeStyle = model.theme.stem;
+    ctx.lineWidth = 4 * model.scale;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(f.x, f.baseY);
+    ctx.lineTo(f.x, curTopY);
+    ctx.stroke();
+
+    if (stemT > 0.3) {
+      const leafAlpha = Math.min(1, (stemT - 0.3) / 0.3);
+      const leafY = f.baseY - (f.baseY - f.topY) * 0.42;
+      ctx.globalAlpha = leafAlpha;
+      drawLeaf(ctx, f.x, leafY, model.scale, -1, model.theme.stem);
+      drawLeaf(ctx, f.x, leafY + 10 * model.scale, model.scale, 1, model.theme.stem);
+      ctx.globalAlpha = 1;
     }
-  }
+
+    const local = Math.max(0, Math.min(1, (bloomT - f.delay) / (1 - f.delay)));
+    if (local <= 0) return;
+    const open = Math.max(0, easeOutBack(local));
+    if (open <= 0.02) return;
+    drawFlowerHead(ctx, f, Math.min(1.08, open), curTopY);
+  });
+}
+
+function setupCanvas(canvas, W, H) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return ctx;
 }
 
 // Sapı büyüten, ardından çiçeği açan canlı animasyon. Her çağrıda baştan oynar.
-function animateBouquet(canvas, themeKey, seedStr, cell, opts) {
+function animateBouquet(canvas, themeKey, seedStr, W, H, opts) {
   opts = opts || {};
   const duration = opts.duration || 2600;
   const theme = THEMES[themeKey] || THEMES.mixed;
-  const model = buildBouquetModel(theme, seedStr);
-
-  const source = document.createElement('canvas');
-  source.width = SRC_W;
-  source.height = SRC_H;
-  const sctx = source.getContext('2d');
+  const ctx = setupCanvas(canvas, W, H);
 
   if (canvas._bouquetRaf) cancelAnimationFrame(canvas._bouquetRaf);
   canvas.classList.remove('idle-breathe');
@@ -195,12 +218,12 @@ function animateBouquet(canvas, themeKey, seedStr, cell, opts) {
   let start = null;
   function frame(ts) {
     if (start === null) start = ts;
+    const model = frame.model || (frame.model = buildBouquetModel(theme, seedStr, W, H));
     const t = Math.min(1, (ts - start) / duration);
-    const stemT = easeOutCubic(Math.min(1, t / 0.42));
-    const bloomT = Math.max(0, Math.min(1, (t - 0.32) / 0.68));
+    const stemT = Math.min(1, t / 0.42);
+    const bloomT = Math.max(0, Math.min(1, (t - 0.3) / 0.7));
 
-    drawModelFrame(sctx, model, stemT, bloomT);
-    renderHalftone(source, canvas, cell);
+    drawModelFrame(ctx, model, W, H, stemT, bloomT);
 
     if (t < 1) {
       canvas._bouquetRaf = requestAnimationFrame(frame);
@@ -230,7 +253,7 @@ function initCreateScreen() {
 
   function updatePreview() {
     const theme = currentTheme(form);
-    animateBouquet(previewCanvas, theme, 'preview-' + theme, 7, { duration: 2000 });
+    animateBouquet(previewCanvas, theme, 'preview-' + theme, 220, 260, { duration: 2000 });
   }
 
   function updateForLine() {
@@ -306,7 +329,7 @@ async function initPresentScreen(data) {
   document.getElementById('toLine').textContent = `${data.to} için`;
 
   const canvas = document.getElementById('presentCanvas');
-  animateBouquet(canvas, data.theme, 'present-' + data.to, 9, { duration: 3200 });
+  animateBouquet(canvas, data.theme, 'present-' + data.to, 280, 340, { duration: 3200 });
 
   if (data.message || data.from) {
     setTimeout(async () => {

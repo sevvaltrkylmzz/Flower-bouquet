@@ -107,7 +107,6 @@ body {
 .canvas-wrap canvas {
   max-width: 100%;
   height: auto;
-  image-rendering: -webkit-optimize-contrast;
 }
 
 .canvas-wrap.big { min-height: 320px; margin-bottom: 8px; }
