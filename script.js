@@ -80,11 +80,11 @@ function hashString(str) {
 // hedef tuvalin gerçek W/H'ine ölçeklenir.
 const REF_W = 300, REF_H = 380;
 const LAYOUT = [
-  { x: -78, h: 190, size: 58 },
-  { x: -42, h: 235, size: 66 },
-  { x: 0, h: 260, size: 74 },
-  { x: 42, h: 235, size: 66 },
-  { x: 78, h: 190, size: 58 }
+  { x: -82, h: 200, size: 72 },
+  { x: -44, h: 248, size: 82 },
+  { x: 0, h: 276, size: 92 },
+  { x: 44, h: 248, size: 82 },
+  { x: 82, h: 200, size: 72 }
 ];
 const LEAF_SPIKE_COUNT = 15;
 
@@ -104,6 +104,12 @@ function shadeHex(hex, amount) {
   g = Math.max(0, Math.min(255, Math.round(g + amount)));
   b = Math.max(0, Math.min(255, Math.round(b + amount)));
   return `rgb(${r},${g},${b})`;
+}
+
+function hexWithAlpha(hex, alpha) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 // Mevcut yolu (path) dolduktan sonra, aynı yola kırpılmış ince çizgilerle
@@ -133,15 +139,30 @@ function petalPath(ctx, length, width) {
   ctx.closePath();
 }
 
-function drawPetal(ctx, length, width, color, seed) {
+function drawPetal(ctx, length, width, color, seed, detailed) {
   petalPath(ctx, length, width);
-  ctx.fillStyle = color;
-  ctx.globalAlpha = 0.88;
+  const grad = ctx.createLinearGradient(0, 0, 0, -length);
+  grad.addColorStop(0, shadeHex(color, -35));
+  grad.addColorStop(0.55, color);
+  grad.addColorStop(1, shadeHex(color, 45));
+  ctx.fillStyle = grad;
   ctx.fill();
-  ctx.globalAlpha = 1;
+
+  if (!detailed) return;
 
   petalPath(ctx, length, width);
-  hatchCurrentPath(ctx, shadeHex(color, -60), -length, 0, width * 0.6, Math.max(2, width * 0.22), seed);
+  hatchCurrentPath(ctx, shadeHex(color, -60), -length, 0, width * 0.55, Math.max(3, width * 0.32), seed);
+
+  // orta damar (merkez çizgi) — hafif gölge, çiçeğe derinlik katar
+  ctx.save();
+  ctx.globalAlpha = 0.25;
+  ctx.strokeStyle = shadeHex(color, -70);
+  ctx.lineWidth = Math.max(0.6, width * 0.04);
+  ctx.beginPath();
+  ctx.moveTo(0, -length * 0.08);
+  ctx.lineTo(0, -length * 0.94);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function spikePath(ctx, length, width) {
@@ -223,24 +244,95 @@ function drawFlowerHead(ctx, f, bloomT, headY) {
   }
 
   if (openT > 0.02) {
-    const open = Math.max(0, Math.min(1.08, easeOutBack(openT)));
-    const petalLen = f.size * 0.54;
-    const petalWidth = f.size * (f.flat ? 0.17 : 0.36);
+    const open = Math.max(0, Math.min(1.14, easeOutBack(openT)));
+    const petalLen = f.size * 0.58;
+    const petalWidth = f.size * (f.flat ? 0.18 : 0.38);
+    const spin = Math.min(1, openT * 1.3);
+
+    // yumuşak ışık halesi — koyu zemine karşı "wow" parlaklığı
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const glowR = f.size * 1.15 * open;
+    const glow = ctx.createRadialGradient(f.x, headY, 0, f.x, headY, glowR);
+    glow.addColorStop(0, hexWithAlpha(f.color, 0.3));
+    glow.addColorStop(1, hexWithAlpha(f.color, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(f.x, headY, glowR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // açılma doruğunda kısa bir parlama (flaş) — dramatik vurgu
+    const flash = Math.max(0, 1 - Math.abs(openT - 0.88) * 9);
+    if (flash > 0.02) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = flash * 0.55;
+      const fg = ctx.createRadialGradient(f.x, headY, 0, f.x, headY, f.size * 0.9);
+      fg.addColorStop(0, '#ffffff');
+      fg.addColorStop(1, hexWithAlpha('#ffffff', 0));
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.arc(f.x, headY, f.size * 0.9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // dış taç yaprakları (büyük, arkada)
     for (let j = 0; j < f.petalCount; j++) {
-      const fullAngle = (Math.PI * 2 / f.petalCount) * j;
-      const angle = fullAngle * Math.min(1, openT * 1.3);
+      const angle = (Math.PI * 2 / f.petalCount) * j * spin;
       ctx.save();
       ctx.translate(f.x, headY);
       ctx.rotate(angle);
       ctx.scale(open, open);
-      drawPetal(ctx, petalLen, petalWidth, f.color, f.hatchSeed + j * 5);
+      drawPetal(ctx, petalLen, petalWidth, f.color, f.hatchSeed + j * 5, true);
+      ctx.restore();
+    }
+
+    // iç taç yaprakları (küçük, önde, aralara serpiştirilmiş — dolgunluk verir, düz gradyan)
+    const innerColor = shadeHex(f.color, 30);
+    for (let j = 0; j < f.petalCount; j++) {
+      const angle = ((Math.PI * 2 / f.petalCount) * (j + 0.5)) * spin;
+      ctx.save();
+      ctx.translate(f.x, headY);
+      ctx.rotate(angle);
+      ctx.scale(open * 0.6, open * 0.6);
+      drawPetal(ctx, petalLen, petalWidth, innerColor, f.hatchSeed + j * 7 + 3, false);
+      ctx.restore();
+    }
+
+    // erkek organlar (stamen) — ince, kavisli, uçlarında başçık
+    if (openT > 0.45) {
+      const stamenA = Math.min(1, (openT - 0.45) / 0.4);
+      ctx.save();
+      ctx.globalAlpha = stamenA;
+      const stamenCount = 6;
+      for (let k = 0; k < stamenCount; k++) {
+        const a = (Math.PI * 2 / stamenCount) * k + 0.3;
+        const len = f.size * 0.4 * open;
+        const x2 = f.x + Math.cos(a) * len * 0.3;
+        const y2 = headY - len * 0.9 + Math.sin(a) * len * 0.2;
+        ctx.strokeStyle = shadeHex(f.center, 20);
+        ctx.lineWidth = Math.max(0.6, f.size * 0.014);
+        ctx.beginPath();
+        ctx.moveTo(f.x, headY);
+        ctx.quadraticCurveTo(f.x + Math.cos(a) * len * 0.5, headY - len * 0.6, x2, y2);
+        ctx.stroke();
+        ctx.fillStyle = shadeHex(f.center, -20);
+        ctx.beginPath();
+        ctx.ellipse(x2, y2, f.size * 0.028, f.size * 0.05, a, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     }
 
     ctx.save();
     ctx.translate(f.x, headY);
     ctx.scale(open, open);
-    ctx.fillStyle = f.center;
+    const centerGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, f.size * 0.13);
+    centerGrad.addColorStop(0, shadeHex(f.center, 35));
+    centerGrad.addColorStop(1, f.center);
+    ctx.fillStyle = centerGrad;
     ctx.beginPath();
     ctx.arc(0, 0, f.size * 0.12, 0, Math.PI * 2);
     ctx.fill();
@@ -339,7 +431,7 @@ function initCreateScreen() {
 
   function updatePreview() {
     const theme = currentTheme(form);
-    animateBouquet(previewCanvas, theme, 'preview-' + theme, 220, 260, { duration: 2000 });
+    animateBouquet(previewCanvas, theme, 'preview-' + theme, 280, 320, { duration: 2400 });
   }
 
   function updateForLine() {
@@ -415,7 +507,7 @@ async function initPresentScreen(data) {
   document.getElementById('toLine').textContent = `${data.to} için`;
 
   const canvas = document.getElementById('presentCanvas');
-  animateBouquet(canvas, data.theme, 'present-' + data.to, 280, 340, { duration: 3200 });
+  animateBouquet(canvas, data.theme, 'present-' + data.to, 360, 430, { duration: 3800 });
 
   if (data.message || data.from) {
     setTimeout(async () => {
