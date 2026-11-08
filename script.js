@@ -80,12 +80,13 @@ function hashString(str) {
 // hedef tuvalin gerçek W/H'ine ölçeklenir.
 const REF_W = 300, REF_H = 380;
 const LAYOUT = [
-  { x: -70, h: 150, size: 60 },
-  { x: -35, h: 190, size: 68 },
-  { x: 0, h: 210, size: 76 },
-  { x: 35, h: 190, size: 68 },
-  { x: 70, h: 150, size: 60 }
+  { x: -78, h: 190, size: 58 },
+  { x: -42, h: 235, size: 66 },
+  { x: 0, h: 260, size: 74 },
+  { x: 42, h: 235, size: 66 },
+  { x: 78, h: 190, size: 58 }
 ];
+const LEAF_SPIKE_COUNT = 15;
 
 function easeOutCubic(x) {
   return 1 - Math.pow(1 - x, 3);
@@ -96,13 +97,78 @@ function easeOutBack(x) {
   return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
 }
 
-// Buketin sabit "modelini" (sap/çiçek konumları, renkleri, gecikmeleri) üretir.
-// Aynı tohumla her zaman aynı şekli verir; animasyon sırasında yeniden rastgelelenmez.
+function shadeHex(hex, amount) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  r = Math.max(0, Math.min(255, Math.round(r + amount)));
+  g = Math.max(0, Math.min(255, Math.round(g + amount)));
+  b = Math.max(0, Math.min(255, Math.round(b + amount)));
+  return `rgb(${r},${g},${b})`;
+}
+
+// Mevcut yolu (path) dolduktan sonra, aynı yola kırpılmış ince çizgilerle
+// tarar (hatching) — düz dolgu yerine kazıma/gravür dokusu verir.
+function hatchCurrentPath(ctx, color, minY, maxY, halfWidth, spacing, seed) {
+  ctx.save();
+  ctx.clip();
+  ctx.lineWidth = Math.max(0.6, spacing * 0.3);
+  ctx.strokeStyle = color;
+  for (let y = minY; y <= maxY; y += spacing) {
+    const a = 0.45 + 0.3 * Math.sin((y + seed) * 0.8);
+    ctx.globalAlpha = Math.max(0.18, a);
+    ctx.beginPath();
+    ctx.moveTo(-halfWidth, y);
+    ctx.lineTo(halfWidth, y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function petalPath(ctx, length, width) {
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(-width * 0.55, -length * 0.35, -width * 0.4, -length * 0.82, 0, -length);
+  ctx.bezierCurveTo(width * 0.4, -length * 0.82, width * 0.55, -length * 0.35, 0, 0);
+  ctx.closePath();
+}
+
+function drawPetal(ctx, length, width, color, seed) {
+  petalPath(ctx, length, width);
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.88;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  petalPath(ctx, length, width);
+  hatchCurrentPath(ctx, shadeHex(color, -60), -length, 0, width * 0.6, Math.max(2, width * 0.22), seed);
+}
+
+function spikePath(ctx, length, width) {
+  ctx.beginPath();
+  ctx.moveTo(-width * 0.5, 0);
+  ctx.quadraticCurveTo(-width * 0.2, -length * 0.6, 0, -length);
+  ctx.quadraticCurveTo(width * 0.2, -length * 0.6, width * 0.5, 0);
+  ctx.closePath();
+}
+
+function drawSpike(ctx, length, width, color, seed) {
+  spikePath(ctx, length, width);
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  spikePath(ctx, length, width);
+  hatchCurrentPath(ctx, shadeHex(color, -45), -length, 0, width * 0.6, Math.max(2, width * 0.3), seed);
+}
+
+// Buketin sabit "modelini" (sap/çiçek/yaprak konumları, renkleri, gecikmeleri)
+// üretir. Aynı tohumla her zaman aynı şekli verir; animasyonda yeniden
+// rastgelelenmez.
 function buildBouquetModel(theme, seedStr, W, H) {
   const rnd = seededRandom(hashString(seedStr || 'bouquet'));
   const sx = W / REF_W, sy = H / REF_H;
   const s = Math.min(sx, sy);
-  const baseY = H - 54 * sy;
+  const baseY = H - 46 * sy;
 
   const flowers = LAYOUT.map((f, i) => {
     const jitter = (rnd() - 0.5) * 6 * sx;
@@ -113,52 +179,73 @@ function buildBouquetModel(theme, seedStr, W, H) {
       size: f.size * s,
       color: theme.flowerColors[i % theme.flowerColors.length],
       center: theme.centers[i % theme.centers.length],
-      delay: (i / (LAYOUT.length - 1)) * 0.35,
+      delay: (i / (LAYOUT.length - 1)) * 0.3,
       petalCount: theme.flat ? 11 : 6,
-      flat: theme.flat
+      flat: theme.flat,
+      hatchSeed: i * 37
     };
   });
 
-  return { theme, flowers, scale: s };
+  const leafSpikes = [];
+  for (let i = 0; i < LEAF_SPIKE_COUNT; i++) {
+    const t = i / (LEAF_SPIKE_COUNT - 1);
+    leafSpikes.push({
+      x: W / 2 + (-1 + 2 * t) * 100 * sx + (rnd() - 0.5) * 8 * sx,
+      len: (50 + rnd() * 34 + (1 - Math.abs(t - 0.5) * 2) * 24) * sy,
+      width: (10 + rnd() * 6) * s,
+      lean: (t - 0.5) * 0.9,
+      delay: Math.abs(t - 0.5) * 0.3,
+      hatchSeed: i * 19
+    });
+  }
+
+  return { theme, flowers, leafSpikes, baseY, scale: s };
 }
 
-function drawFlowerHead(ctx, f, open, headY) {
-  const petalLen = f.size * 0.52;
-  const petalWidth = f.size * (f.flat ? 0.16 : 0.34);
+function drawFlowerHead(ctx, f, bloomT, headY) {
+  const budT = Math.min(1, bloomT / 0.32);
+  const openT = Math.max(0, Math.min(1, (bloomT - 0.26) / 0.74));
+  if (budT <= 0.01) return;
 
-  for (let j = 0; j < f.petalCount; j++) {
-    const angle = (Math.PI * 2 / f.petalCount) * j;
-    const twist = (1 - open) * 0.8 * (j % 2 === 0 ? 1 : -1);
+  if (openT < 0.94) {
+    const budScale = budT * (1 - 0.55 * openT);
+    if (budScale > 0.03) {
+      ctx.save();
+      ctx.translate(f.x, headY);
+      ctx.scale(budScale, budScale);
+      const len = f.size * 0.4;
+      ctx.beginPath();
+      ctx.ellipse(0, -len * 0.5, f.size * 0.13, len * 0.5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = shadeHex(f.color, -70);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  if (openT > 0.02) {
+    const open = Math.max(0, Math.min(1.08, easeOutBack(openT)));
+    const petalLen = f.size * 0.54;
+    const petalWidth = f.size * (f.flat ? 0.17 : 0.36);
+    for (let j = 0; j < f.petalCount; j++) {
+      const fullAngle = (Math.PI * 2 / f.petalCount) * j;
+      const angle = fullAngle * Math.min(1, openT * 1.3);
+      ctx.save();
+      ctx.translate(f.x, headY);
+      ctx.rotate(angle);
+      ctx.scale(open, open);
+      drawPetal(ctx, petalLen, petalWidth, f.color, f.hatchSeed + j * 5);
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.translate(f.x, headY);
-    ctx.rotate(angle + twist);
     ctx.scale(open, open);
-    ctx.fillStyle = f.color;
+    ctx.fillStyle = f.center;
     ctx.beginPath();
-    ctx.ellipse(0, -petalLen * 0.52, petalWidth / 2, petalLen * 0.52, 0, 0, Math.PI * 2);
+    ctx.arc(0, 0, f.size * 0.12, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
-
-  ctx.save();
-  ctx.translate(f.x, headY);
-  ctx.scale(open, open);
-  ctx.fillStyle = f.center;
-  ctx.beginPath();
-  ctx.arc(0, 0, f.size * 0.14, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawLeaf(ctx, x, y, s, dir, color) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(dir > 0 ? -0.5 : Math.PI + 0.5);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 14 * s, 6 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
 }
 
 // Modeli, sap (stemT) ve açılma (bloomT) ilerlemesine göre tuvale çizer.
@@ -166,31 +253,30 @@ function drawModelFrame(ctx, model, W, H, stemT, bloomT) {
   ctx.clearRect(0, 0, W, H);
   const grownStem = easeOutCubic(stemT);
 
+  model.leafSpikes.forEach((sp) => {
+    const local = Math.max(0, Math.min(1, (stemT - sp.delay) / (1 - sp.delay)));
+    const grown = easeOutCubic(local);
+    if (grown <= 0.01) return;
+    ctx.save();
+    ctx.translate(sp.x, model.baseY);
+    ctx.rotate(sp.lean * 0.3);
+    drawSpike(ctx, sp.len * grown, sp.width, model.theme.stem, sp.hatchSeed);
+    ctx.restore();
+  });
+
   model.flowers.forEach((f) => {
     const curTopY = f.baseY - (f.baseY - f.topY) * grownStem;
 
     ctx.strokeStyle = model.theme.stem;
-    ctx.lineWidth = 4 * model.scale;
+    ctx.lineWidth = 3.4 * model.scale;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(f.x, f.baseY);
     ctx.lineTo(f.x, curTopY);
     ctx.stroke();
 
-    if (stemT > 0.3) {
-      const leafAlpha = Math.min(1, (stemT - 0.3) / 0.3);
-      const leafY = f.baseY - (f.baseY - f.topY) * 0.42;
-      ctx.globalAlpha = leafAlpha;
-      drawLeaf(ctx, f.x, leafY, model.scale, -1, model.theme.stem);
-      drawLeaf(ctx, f.x, leafY + 10 * model.scale, model.scale, 1, model.theme.stem);
-      ctx.globalAlpha = 1;
-    }
-
     const local = Math.max(0, Math.min(1, (bloomT - f.delay) / (1 - f.delay)));
-    if (local <= 0) return;
-    const open = Math.max(0, easeOutBack(local));
-    if (open <= 0.02) return;
-    drawFlowerHead(ctx, f, Math.min(1.08, open), curTopY);
+    drawFlowerHead(ctx, f, local, curTopY);
   });
 }
 
