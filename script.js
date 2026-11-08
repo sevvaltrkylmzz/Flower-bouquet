@@ -56,54 +56,92 @@ function hashString(str) {
   return Math.abs(h) || 1;
 }
 
-// Küçük bir kaynak tuvale buket çizer (saplar + çiçek lekeleri).
-function createSourceArt(theme, seedStr) {
-  const W = 48, H = 66;
-  const c = document.createElement('canvas');
-  c.width = W;
-  c.height = H;
-  const ctx = c.getContext('2d');
+const SRC_W = 48, SRC_H = 66;
+const BASE_X = SRC_W / 2, BASE_Y = SRC_H - 6;
+const SPIKE_COUNT = 11;
+const BLOB_COUNT = 30;
+const CLUSTER_X = SRC_W / 2, CLUSTER_Y = SRC_H * 0.4;
+
+function easeOutCubic(x) {
+  return 1 - Math.pow(1 - x, 3);
+}
+
+function easeOutBack(x) {
+  const c1 = 1.70158, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+}
+
+// Buketin sabit "modelini" (sap açıları, çiçek lekesi konum/renk/gecikmesi) üretir.
+// Aynı tohumla her zaman aynı şekli verir; animasyon sırasında yeniden rastgelelenmez.
+function buildBouquetModel(theme, seedStr) {
   const rnd = seededRandom(hashString(seedStr || 'bouquet'));
 
-  // sap / yaprak yıldızı (taban)
-  const baseX = W / 2, baseY = H - 6;
-  ctx.fillStyle = theme.stem;
-  const spikes = 11;
-  ctx.beginPath();
-  for (let i = 0; i < spikes; i++) {
-    const a = -Math.PI + (Math.PI / (spikes - 1)) * i;
-    const len = 20 + rnd() * 14;
-    const x1 = baseX + Math.cos(a) * 2, y1 = baseY + Math.sin(a) * 2;
-    const x2 = baseX + Math.cos(a) * len, y2 = baseY + Math.sin(a) * len * 0.85;
-    const perp = a + Math.PI / 2;
-    const spread = 2.1;
+  const spikes = [];
+  for (let i = 0; i < SPIKE_COUNT; i++) {
+    const a = -Math.PI + (Math.PI / (SPIKE_COUNT - 1)) * i;
+    spikes.push({
+      angle: a,
+      maxLen: 20 + rnd() * 14,
+      delay: Math.abs(i - (SPIKE_COUNT - 1) / 2) / ((SPIKE_COUNT - 1) / 2) * 0.25
+    });
+  }
+
+  const blobs = [];
+  for (let i = 0; i < BLOB_COUNT; i++) {
+    const ang = rnd() * Math.PI * 2;
+    const distFrac = Math.sqrt(rnd());
+    blobs.push({
+      angle: ang,
+      dist: distFrac * SRC_W * 0.34,
+      maxR: 6 + rnd() * 8,
+      color: theme.petals[Math.floor(rnd() * theme.petals.length)],
+      delay: distFrac * 0.55
+    });
+  }
+
+  return { theme, spikes, blobs };
+}
+
+// Modeli, sap (stemT) ve açılma (bloomT) ilerlemesine göre bir kaynak tuvale çizer.
+function drawModelFrame(ctx, model, stemT, bloomT) {
+  ctx.clearRect(0, 0, SRC_W, SRC_H);
+
+  ctx.fillStyle = model.theme.stem;
+  model.spikes.forEach((sp) => {
+    const local = Math.max(0, Math.min(1, (stemT - sp.delay) / (1 - sp.delay)));
+    const grown = easeOutCubic(local);
+    if (grown <= 0) return;
+    const len = sp.maxLen * grown;
+    const x1 = BASE_X + Math.cos(sp.angle) * 2, y1 = BASE_Y + Math.sin(sp.angle) * 2;
+    const x2 = BASE_X + Math.cos(sp.angle) * len, y2 = BASE_Y + Math.sin(sp.angle) * len * 0.85;
+    const perp = sp.angle + Math.PI / 2;
+    const spread = 2.1 * grown;
+    ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2 + Math.cos(perp) * spread, y2 + Math.sin(perp) * spread);
     ctx.lineTo(x2 - Math.cos(perp) * spread, y2 - Math.sin(perp) * spread);
     ctx.closePath();
-  }
-  ctx.fill();
+    ctx.fill();
+  });
 
-  // çiçek lekeleri (üst küme) — merkeze yakın yoğun, kenarlarda seyrekleşen dolgu
-  const cx = W / 2, cy = H * 0.4;
-  const blobCount = 30;
-  for (let i = 0; i < blobCount; i++) {
-    const ang = rnd() * Math.PI * 2;
-    const dist = Math.sqrt(rnd()) * W * 0.34;
-    const bx = cx + Math.cos(ang) * dist;
-    const by = cy + Math.sin(ang) * dist * 0.8;
-    const r = 6 + rnd() * 8;
-    const color = theme.petals[Math.floor(rnd() * theme.petals.length)];
+  if (bloomT <= 0) return;
+  model.blobs.forEach((b) => {
+    const local = Math.max(0, Math.min(1, (bloomT - b.delay) / (1 - b.delay)));
+    if (local <= 0) return;
+    const open = easeOutBack(local);
+    const r = Math.max(0, b.maxR * Math.min(1, open));
+    if (r <= 0.1) return;
+    const dist = b.dist * Math.min(1, local * 1.15);
+    const bx = CLUSTER_X + Math.cos(b.angle) * dist;
+    const by = CLUSTER_Y + Math.sin(b.angle) * dist * 0.8;
     const g = ctx.createRadialGradient(bx, by, 0, bx, by, r);
-    g.addColorStop(0, color);
+    g.addColorStop(0, b.color);
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(bx, by, r, 0, Math.PI * 2);
     ctx.fill();
-  }
-
-  return c;
+  });
 }
 
 // Kaynak tuvali, her pikseli bir noktaya çeviren halftone görünümüne render eder.
@@ -139,10 +177,40 @@ function renderHalftone(sourceCanvas, destCanvas, cell) {
   }
 }
 
-function drawBouquet(canvas, themeKey, seedStr, cell) {
+// Sapı büyüten, ardından çiçeği açan canlı animasyon. Her çağrıda baştan oynar.
+function animateBouquet(canvas, themeKey, seedStr, cell, opts) {
+  opts = opts || {};
+  const duration = opts.duration || 2600;
   const theme = THEMES[themeKey] || THEMES.mixed;
-  const source = createSourceArt(theme, seedStr);
-  renderHalftone(source, canvas, cell);
+  const model = buildBouquetModel(theme, seedStr);
+
+  const source = document.createElement('canvas');
+  source.width = SRC_W;
+  source.height = SRC_H;
+  const sctx = source.getContext('2d');
+
+  if (canvas._bouquetRaf) cancelAnimationFrame(canvas._bouquetRaf);
+  canvas.classList.remove('idle-breathe');
+
+  let start = null;
+  function frame(ts) {
+    if (start === null) start = ts;
+    const t = Math.min(1, (ts - start) / duration);
+    const stemT = easeOutCubic(Math.min(1, t / 0.42));
+    const bloomT = Math.max(0, Math.min(1, (t - 0.32) / 0.68));
+
+    drawModelFrame(sctx, model, stemT, bloomT);
+    renderHalftone(source, canvas, cell);
+
+    if (t < 1) {
+      canvas._bouquetRaf = requestAnimationFrame(frame);
+    } else {
+      canvas._bouquetRaf = null;
+      canvas.classList.add('idle-breathe');
+      if (opts.onDone) opts.onDone();
+    }
+  }
+  canvas._bouquetRaf = requestAnimationFrame(frame);
 }
 
 // ---------- Oluşturma ekranı ----------
@@ -162,7 +230,7 @@ function initCreateScreen() {
 
   function updatePreview() {
     const theme = currentTheme(form);
-    drawBouquet(previewCanvas, theme, 'preview-' + theme, 7);
+    animateBouquet(previewCanvas, theme, 'preview-' + theme, 7, { duration: 2000 });
   }
 
   function updateForLine() {
@@ -238,7 +306,7 @@ async function initPresentScreen(data) {
   document.getElementById('toLine').textContent = `${data.to} için`;
 
   const canvas = document.getElementById('presentCanvas');
-  drawBouquet(canvas, data.theme, 'present-' + data.to, 9);
+  animateBouquet(canvas, data.theme, 'present-' + data.to, 9, { duration: 3200 });
 
   if (data.message || data.from) {
     setTimeout(async () => {

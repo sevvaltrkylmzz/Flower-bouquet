@@ -112,23 +112,13 @@ body {
 
 .canvas-wrap.big { min-height: 320px; margin-bottom: 8px; }
 
-.reveal {
-  clip-path: inset(0% 0% 100% 0%);
-  transform: scale(0.92);
-  opacity: 0;
-  animation: revealUp 1.5s cubic-bezier(.22,.9,.3,1) forwards 0.2s,
-             floatIdle 5s ease-in-out infinite 1.8s;
+.canvas-wrap canvas.idle-breathe {
+  animation: breathe 4.5s ease-in-out infinite;
 }
 
-@keyframes revealUp {
-  0% { clip-path: inset(0% 0% 100% 0%); transform: scale(0.9); opacity: 0; }
-  40% { opacity: 1; }
-  100% { clip-path: inset(0% 0% 0% 0%); transform: scale(1); opacity: 1; }
-}
-
-@keyframes floatIdle {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+@keyframes breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5px) scale(1.012); }
 }
 
 /* ---------- form ---------- */
